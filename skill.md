@@ -1,8 +1,8 @@
 ---
-name: save-article
+name: save-webpage
 description: >
   Saves a web article as a formatted markdown file into your Obsidian vault.
-  Triggers: /save-article <url>, "save this article", "clip this page"
+  Triggers: /save-webpage <url>, "save this article", "clip this page"
 argument-hint: "<url>"
 ---
 
@@ -35,7 +35,7 @@ Followed by the article content in markdown (h1 title, paragraphs, lists, blockq
 
 ### Step 1 — Get the URL
 
-The URL is passed as argument: `/save-article <url>`
+The URL is passed as argument: `/save-webpage <url>`
 If no URL is provided, ask the user.
 
 ### Step 2 — Extract the content

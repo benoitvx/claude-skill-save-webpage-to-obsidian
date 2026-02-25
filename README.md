@@ -1,4 +1,4 @@
-# save-article-to-obsidian
+# save-webpage-to-obsidian
 
 ![Claude Code Skill](https://img.shields.io/badge/Claude_Code-Skill-blueviolet)
 
@@ -12,20 +12,20 @@ A [Claude Code](https://docs.anthropic.com/en/docs/claude-code) skill that saves
 ## Installation
 
 ```bash
-mkdir -p ~/.claude/skills/save-article
-cp skill.md ~/.claude/skills/save-article/skill.md
+mkdir -p ~/.claude/skills/save-webpage
+cp skill.md ~/.claude/skills/save-webpage/skill.md
 ```
 
 Or clone this repo and copy:
 
 ```bash
-git clone https://github.com/benoitvx/claude-skill-save-article-to-obsidian.git
-cp claude-skill-save-article-to-obsidian/skill.md ~/.claude/skills/save-article/skill.md
+git clone https://github.com/benoitvx/claude-skill-save-webpage-to-obsidian.git
+cp claude-skill-save-webpage-to-obsidian/skill.md ~/.claude/skills/save-webpage/skill.md
 ```
 
 ## Configuration
 
-Open `~/.claude/skills/save-article/skill.md` and edit the **Output directory** path in the `## Configuration` section to point to your Obsidian vault folder:
+Open `~/.claude/skills/save-webpage/skill.md` and edit the **Output directory** path in the `## Configuration` section to point to your Obsidian vault folder:
 
 ```markdown
 - **Output directory**: `~/my-obsidian-vault/Articles/`
@@ -34,7 +34,7 @@ Open `~/.claude/skills/save-article/skill.md` and edit the **Output directory** 
 ## Usage
 
 ```
-/save-article https://example.com/some-article
+/save-webpage https://example.com/some-article
 ```
 
 Claude will:
