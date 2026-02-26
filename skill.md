@@ -1,160 +1,112 @@
 ---
-name: save-webpage
+name: save-article
 description: >
-  Saves a web article as a formatted markdown file into your Obsidian vault.
-  Triggers: /save-webpage <url>, "save this article", "clip this page"
-argument-hint: "<url>"
+  Sauvegarde un article web en markdown dans le vault Obsidian (dossier Veille/).
+  Triggers: /save-article <url>, "sauvegarde cet article", "enregistre cet article dans Veille"
 ---
 
-# Skill: Save Article to Obsidian
+# Skill : Save Article
 
-Extracts a web article and saves it as a clean markdown file with YAML frontmatter into your Obsidian vault.
+Sauvegarde un article web en fichier markdown formaté pour Obsidian dans le dossier `Veille/` du vault.
 
-## Configuration
+## Chemins
 
-Edit the path below to point to your Obsidian vault folder:
+- **Vault Obsidian** : `/Users/dinum-327811/Library/CloudStorage/GoogleDrive-benoitvinceneux@gmail.com/Mon Drive/Work/DINUM - EIG/ETALAB/ETALAB-Obsidian`
+- **Dossier cible** : `Veille/` (dans le vault ci-dessus)
+- **Dossier téléchargements** : `/Users/dinum-327811/Downloads`
 
-- **Output directory**: `~/path/to/your/obsidian-vault/Articles/`
+## Format de sortie
 
-## Output format
-
-The markdown file follows this template:
+Le fichier markdown doit suivre ce template exact :
 
 ```yaml
 ---
-title: "Article title"
-source: "https://full-url.com/article"
-date: "YYYY-MM-DD"
-summary: "AI-generated 2-sentence summary."
+titre: "Titre de l'article"
+source: "https://url-complete.com/article"
+date_publication: "YYYY-MM-DD"
+résumé: "Résumé en 2 phrases généré par l'IA."
 ---
 ```
 
-Followed by the article content in markdown (h1 title, paragraphs, lists, blockquotes, code blocks).
+Suivi du contenu markdown de l'article (titre h1, paragraphes, listes, citations, blocs de code).
 
 ## Workflow
 
-### Step 1 — Get the URL
+### Étape 1 — Récupérer l'URL
 
-The URL is passed as argument: `/save-webpage <url>`
-If no URL is provided, ask the user.
+L'URL est passée en argument : `/save-article <url>`
+Si aucune URL n'est fournie, demander à l'utilisateur.
 
-### Step 2 — Extract the content
+### Étape 2 — Vérifier les doublons
 
-Use a **dual extraction strategy**: try Chrome browser automation first, fall back to WebFetch if Chrome is not connected.
+Avant de récupérer le contenu, vérifier si l'article n'a pas déjà été sauvegardé :
 
-#### Strategy A — Chrome (preferred)
+1. Utiliser `Grep` pour chercher l'URL exacte dans les frontmatter `source:` de tous les fichiers du dossier `Veille/` :
+   - Pattern : l'URL fournie par l'utilisateur
+   - Glob : `*.md`
+   - Path : le dossier `Veille/` du vault
+2. **Si un fichier match** → informer l'utilisateur avec le chemin du fichier existant et lui demander s'il veut :
+   - Écraser le fichier existant
+   - Créer un nouveau fichier (suffixe numéroté)
+   - Annuler
+3. **Si aucun match** → continuer sans interruption
 
-1. Call `tabs_context_mcp` to get browser context
-2. Create a new tab with `tabs_create_mcp`
-3. Navigate to the URL with `navigate`
-4. Wait 3 seconds with `computer` action `wait` to let the page load
-5. Use `javascript_tool` to run the extraction script below
+### Étape 3 — Extraire le contenu via WebFetch
 
-If `tabs_context_mcp` fails or Chrome is not connected, fall back to Strategy B.
+Utiliser `WebFetch` avec l'URL et le prompt d'extraction suivant :
 
-#### Strategy B — WebFetch (fallback)
+> Extrais le contenu de cet article de manière structurée. Retourne :
+> 1. **Titre** : le titre principal de l'article
+> 2. **Date de publication** : au format YYYY-MM-DD si disponible, sinon vide
+> 3. **Contenu** : le contenu complet de l'article formaté en markdown propre (titres h2/h3, paragraphes, listes, citations avec >, blocs de code avec ```, images avec ![alt](src))
+>
+> Format de réponse :
+> TITRE: ...
+> DATE: ...
+> CONTENU:
+> ...
 
-1. Use the `WebFetch` tool to fetch the URL
-2. In the prompt, ask to extract: the article title, publication date (YYYY-MM-DD format), and the full article content as clean markdown (headings, paragraphs, lists, blockquotes, code blocks)
-3. Parse the result to get title, date, and content
+**Fallback Chrome** — Si WebFetch échoue (erreur réseau, page bloquée, contenu vide ou insuffisant < 100 caractères) :
 
-### JavaScript extraction script (for Strategy A)
+1. Appeler `tabs_context_mcp` pour obtenir le contexte navigateur
+2. Créer un nouvel onglet avec `tabs_create_mcp`
+3. Naviguer vers l'URL avec `navigate`
+4. Attendre 3 secondes avec `computer` action `wait` pour laisser la page charger
+5. Utiliser `javascript_tool` pour extraire titre, date et contenu (querySelectorAll sur h1-h4, p, ul, ol, blockquote, pre, img)
+6. Si l'extraction JS retourne peu de contenu (< 100 caractères), utiliser `get_page_text` comme fallback supplémentaire
 
-```javascript
-(() => {
-  // Title
-  const h1 = document.querySelector('article h1, main h1, .post-title, .entry-title, h1');
-  const title = h1 ? h1.innerText.trim() : document.title.trim();
+### Étape 4 — Générer le résumé
 
-  // Publication date
-  let date = '';
-  const timeEl = document.querySelector('time[datetime]');
-  if (timeEl) {
-    date = timeEl.getAttribute('datetime').substring(0, 10);
-  } else {
-    const metaDate = document.querySelector(
-      'meta[property="article:published_time"], meta[name="date"], meta[name="publication_date"], meta[name="DC.date"]'
-    );
-    if (metaDate) {
-      date = metaDate.content.substring(0, 10);
-    }
-  }
+À partir du contenu extrait, rédiger un résumé en **2 phrases** en français qui synthétise les points clés de l'article. Le résumé doit être informatif et concis.
 
-  // Article content — target the main container
-  const articleEl = document.querySelector('article, main, .post-content, .entry-content, .article-body, [role="main"]');
-  const container = articleEl || document.body;
+### Étape 5 — Construire le fichier markdown
 
-  const blocks = container.querySelectorAll('h1, h2, h3, h4, p, ul, ol, blockquote, pre, figure img');
-  const lines = [];
+Assembler le fichier avec :
+- Le frontmatter YAML (titre, source, date_publication, résumé)
+- Le contenu markdown extrait
 
-  blocks.forEach(el => {
-    const tag = el.tagName.toLowerCase();
-    const text = el.innerText ? el.innerText.trim() : '';
-    if (!text && tag !== 'img') return;
+Le nom du fichier sera le titre de l'article, nettoyé des caractères spéciaux : remplacer `/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|` par `-`, et tronquer à 100 caractères max. Extension `.md`.
 
-    if (tag === 'h1') lines.push(`# ${text}\n`);
-    else if (tag === 'h2') lines.push(`## ${text}\n`);
-    else if (tag === 'h3') lines.push(`### ${text}\n`);
-    else if (tag === 'h4') lines.push(`#### ${text}\n`);
-    else if (tag === 'p') lines.push(`${text}\n`);
-    else if (tag === 'ul') {
-      el.querySelectorAll(':scope > li').forEach(li => {
-        lines.push(`- ${li.innerText.trim()}`);
-      });
-      lines.push('');
-    }
-    else if (tag === 'ol') {
-      let i = 1;
-      el.querySelectorAll(':scope > li').forEach(li => {
-        lines.push(`${i}. ${li.innerText.trim()}`);
-        i++;
-      });
-      lines.push('');
-    }
-    else if (tag === 'blockquote') lines.push(`> ${text}\n`);
-    else if (tag === 'pre') lines.push(`\`\`\`\n${text}\n\`\`\`\n`);
-    else if (tag === 'img') {
-      const src = el.getAttribute('src');
-      const alt = el.getAttribute('alt') || '';
-      if (src) lines.push(`![${alt}](${src})\n`);
-    }
-  });
+### Étape 6 — Écrire le fichier
 
-  JSON.stringify({ title, date, content: lines.join('\n') });
-})()
-```
-
-### Step 3 — Generate the summary
-
-From the extracted content, write a **2-sentence summary** in the **same language as the article**. The summary should be informative and concise, capturing the key points.
-
-### Step 4 — Build the markdown file
-
-Assemble the file with:
-- YAML frontmatter (title, source, date, summary)
-- The extracted markdown content
-
-The filename is derived from the article title: replace `/`, `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|` with `-`, and truncate to 100 characters max. Extension: `.md`.
-
-### Step 5 — Write the file
-
-Use the `Write` tool to save the file to the configured output directory:
+Utiliser le tool `Write` pour écrire directement le fichier dans le dossier Veille/ du vault :
 
 ```
-{output-directory}/{cleaned-filename}.md
+{vault}/Veille/{nom-fichier-nettoyé}.md
 ```
 
-### Step 6 — Confirm
+### Étape 7 — Confirmer
 
-Display to the user:
-- The article title
-- The generated summary
-- The full path of the created file
+Afficher à l'utilisateur :
+- Le titre de l'article
+- Le résumé généré
+- Le chemin du fichier créé
 
-## Error handling
+## Gestion d'erreurs
 
-- **Chrome not connected**: automatically fall back to WebFetch (Strategy B). If WebFetch also fails, inform the user.
-- **JS-heavy / SPA page**: if Chrome extraction returns empty or very short content (< 100 characters), use `get_page_text` as a secondary fallback, then format the raw text as markdown.
-- **Date not found**: leave `date` empty (`""`).
-- **Title not found**: use `document.title` as fallback (Chrome) or the page `<title>` tag (WebFetch).
-- **Write failed**: inform the user and offer to write to the Downloads folder instead.
+- **WebFetch échoue** : tenter automatiquement le fallback Chrome (étape 3). Si Chrome n'est pas connecté, informer l'utilisateur d'ouvrir Chrome avec l'extension Claude et réessayer.
+- **Page JS-heavy / SPA (fallback Chrome)** : si l'extraction JS retourne un contenu vide ou très court (< 100 caractères), utiliser `get_page_text` comme fallback pour récupérer le texte brut, puis le formater en markdown.
+- **Date introuvable** : laisser `date_publication` vide (`""`).
+- **Titre introuvable** : utiliser le titre de la page comme fallback.
+- **Écriture échouée** : informer l'utilisateur et proposer d'écrire dans Downloads/ à la place.
+- **Doublon détecté** : ne jamais écraser silencieusement — toujours demander confirmation à l'utilisateur.
